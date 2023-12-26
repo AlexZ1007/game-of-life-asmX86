@@ -36,12 +36,23 @@ decrementedNrLinii: .space 4
 decrementedNrColoane: .space 4
 
 
-formatScanf: .asciz "%d"
-formatPrintf: .asciz "%d "
+inceputHexa: .asciz "0x"
 
+formatScanf: .asciz "%d"
+formatPrintf: .asciz "%X"
+
+formatStringScanf: .asciz "%s"
+formatStringPrintf: .asciz "%s\n"
+
+
+mode: .long 0
 
 # String pentru a doua problema
 string: .asciz "parola"
+numarHexa: .space 32
+
+hexaNumar: .long 0
+hexaCounter: .long 4
 
 newLine: .asciz "\n"
 .text
@@ -299,17 +310,16 @@ xorare:
     xor %eax, %ebx
 
     mov 16(%ebp), %eax   # Pozitia din matricea "criptata"
-    mov %ebx, (%edi, %eax, 4)
+    mov %ebx, %eax       # In eax bit-ul xorat
 
-    
-        push %ebx
-        push $formatPrintf       
-        call printf            
-        addl $8, %esp
+#  push %ebx
+#        push $formatPrintf       
+#       call printf            
+#        addl $8, %esp
 
-        pushl $0
-        call fflush
-        addl $4, %esp
+    #    pushl $0
+    #    call fflush
+    #    addl $4, %esp
 
 
     exit_xorare:
@@ -330,18 +340,21 @@ call citire_matrice
 
 # Citire k
 pushl $k
-pushl $formatPrintf
+pushl $formatScanf
 call scanf
 addl $8, %esp
 
-pushl $0
-call fflush
-addl $4, %esp
+
+pushl $mode
+pushl $formatScanf
+call scanf
+addl $8, %esp
+
 
 
 
 # Calculare generatii
-
+lea matrix, %edi
 movl $0, generatiiIndex   
 for_generatii:
     movl generatiiIndex, %ecx
@@ -410,7 +423,7 @@ for_generatii:
 
 sfarsit_generatii:
 
-movl $string, %esi        
+
 
 mov nrColoane, %eax
 xor %edx, %edx
@@ -431,12 +444,39 @@ jmp even_number_string
 
 even_number_string:
     lea alternateMatrix, %edi
-    jmp process_string
+    jmp bef_process_string
     
 
 odd_number_string:
     lea matrix, %edi
-    jmp process_string
+    jmp bef_process_string
+
+
+
+bef_process_string:
+
+
+pushl $string
+pushl $formatStringScanf
+call scanf
+addl $8, %esp
+
+movl $string, %esi    
+
+
+movl mode, %eax
+cmp $0, %eax
+je criptare
+jmp decriptare
+
+
+criptare:
+    
+
+
+push $inceputHexa   
+call printf            
+addl $4, %esp
 
 
 process_string:
@@ -471,6 +511,29 @@ process_string:
         pop %ecx
         pop %ecx
 
+        
+
+        subl $1, hexaCounter
+        mov hexaCounter, %cl
+        shl %cl, %al       # Eax valoare ret de xorare
+        addl %eax, hexaNumar 
+    
+
+        cmp $0, %cl
+        jne skip_print
+
+        movl hexaNumar, %eax    
+        pushl %eax              
+        pushl $formatPrintf     
+        call printf
+        addl $8, %esp          
+
+
+        
+        movl $4, hexaCounter
+        movl $0, hexaNumar
+
+        skip_print: 
 
 
         addl $1, numarElementeCriptare
@@ -496,7 +559,98 @@ process_string:
     jmp process_string     
 
 
+
+decriptare:
+
+
+process_string_dec:
+    movzbl (%esi), %eax     
+    test %eax, %eax          # Verificare null terminator
+    je et_exit               
+    mov $7, %ebx             # Loop counter
+
+    print_bits_dec:
+        movzbl (%esi), %eax      
+        movb %bl, %cl
+        shr %cl, %eax            
+
+        mov %eax, %edx           
+        and $1, %edx             # Izolare bit
+        
+
+        mov elemCurent, %eax
+        movl (%edi, %eax, 4), %ecx      # Elem din mattrice
+
+
+
+       
+
+        push generatiiIndex
+        push numarElementeCriptare
+        push %edx
+        push %ecx
+        call xorare
+        pop %ecx
+        pop %ecx
+        pop %ecx
+        pop %ecx
+
+        
+
+        subl $1, hexaCounter
+        mov hexaCounter, %cl
+        shl %cl, %al       # Eax valoare ret de xorare
+        addl %eax, hexaNumar 
+    
+
+        cmp $0, %cl
+        jne skip_print
+
+        movl hexaNumar, %eax    
+        pushl %eax              
+        pushl $formatPrintf     
+        call printf
+        addl $8, %esp          
+
+
+        
+        movl $4, hexaCounter
+        movl $0, hexaNumar
+
+        skip_print_dec: 
+
+
+        addl $1, numarElementeCriptare
+
+
+        addl $1, elemCurent 
+        mov elemCurent, %ecx
+        cmp originalNrElemente, %ecx
+        je resetCurentValue_dec
+        jmp keepCurentValue_dec
+
+        resetCurentValue_dec:
+        movl $0, elemCurent # Reset to initial position
+
+        keepCurentValue_dec:
+        sub $1, %ebx                 
+        cmp $0, %ebx
+        jge print_bits_dec          
+
+
+    # Outer loop
+    incl %esi                #  next character
+    jmp process_string_dec  
+
+
+
 et_exit:
+    
+    push $newLine   
+    call printf            
+    addl $4, %esp
+
+
     mov $1, %eax
     xor %ebx, %ebx
     int $0x80
