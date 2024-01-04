@@ -269,6 +269,7 @@ addl $8, %esp
 
 # Pentru afisare matrice extinsa
 
+lea matrix, %edi
 movl $0, generatiiIndex   
 for_generatii:
     movl generatiiIndex, %ecx
@@ -381,6 +382,10 @@ et_afis_matr_final:
 
 
 et_exit:
+    pushl $0
+    call fflush
+    addl $4, %esp
+
     mov $1, %eax
     xor %ebx, %ebx
     int $0x80
